@@ -1,7 +1,6 @@
 """Web app: upload an invoice, see what was extracted and what needs review."""
 
 from datetime import date
-from decimal import Decimal
 from pathlib import Path
 
 import anthropic
@@ -13,10 +12,6 @@ from app.config import settings
 from pipeline.extract import SUPPORTED_TYPES, ExtractionError, extract_invoice
 from pipeline.models import Invoice
 from pipeline.validate import validate_invoice
-
-# Claude Opus 5.5 list prices, in dollars per million tokens.
-INPUT_PRICE = Decimal("4")
-OUTPUT_PRICE = Decimal("20")
 
 app = FastAPI(title="Invoice Automation")
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
@@ -93,15 +88,12 @@ async def upload_invoice(request: Request, file: UploadFile):
 
     client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
     try:
-        result = extract_invoice(data, file.content_type, client)
+        result = extract_invoice(data, file.content_type, client, settings.extraction_model)
     except ExtractionError as err:
         return error(str(err), 422)
     except anthropic.APIError as err:
         return error(f"The AI service returned an error: {err.message}", 502)
 
-    cost = (result.input_tokens * INPUT_PRICE + result.output_tokens * OUTPUT_PRICE) / Decimal(
-        1_000_000
-    )
     return _render(
         request,
         "result.html",
@@ -109,9 +101,10 @@ async def upload_invoice(request: Request, file: UploadFile):
         issues=validate_invoice(result.invoice),
         filename=file.filename,
         stats={
+            "model": result.model,
             "attempts": result.attempts,
             "input_tokens": result.input_tokens,
             "output_tokens": result.output_tokens,
-            "cost": f"${cost:.4f}",
+            "cost": f"${result.cost:.4f}",
         },
     )

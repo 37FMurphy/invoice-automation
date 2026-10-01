@@ -2,13 +2,45 @@
 
 import base64
 from dataclasses import dataclass
+from decimal import Decimal
 
 import anthropic
 from pydantic import BaseModel, ValidationError
 
 from pipeline.models import Invoice
 
-MODEL = "claude-opus-5-5"
+
+@dataclass(frozen=True)
+class ModelConfig:
+    input_price: Decimal  # dollars per million tokens
+    output_price: Decimal
+    request_options: dict
+
+
+# Every model we can run, with its list price and the options it accepts.
+# Haiku 4.5 does not support the effort setting or server-side fallbacks.
+MODELS = {
+    "claude-opus-5-5": ModelConfig(
+        Decimal("4"),
+        Decimal("20"),
+        {
+            "output_config": {"effort": "low"},
+            "betas": ["server-side-fallback-2026-07-01"],
+            "fallbacks": "default",
+        },
+    ),
+    "claude-sonnet-5-5": ModelConfig(
+        Decimal("2"),
+        Decimal("10"),
+        {
+            "output_config": {"effort": "low"},
+            "betas": ["server-side-fallback-2026-07-01"],
+            "fallbacks": "default",
+        },
+    ),
+    "claude-haiku-4-5": ModelConfig(Decimal("1"), Decimal("5"), {}),
+}
+DEFAULT_MODEL = "claude-opus-5-5"
 MAX_ATTEMPTS = 2
 
 IMAGE_TYPES = {"image/png", "image/jpeg", "image/gif", "image/webp"}
@@ -59,6 +91,15 @@ class ExtractionResult:
     attempts: int
     input_tokens: int
     output_tokens: int
+    model: str
+
+    @property
+    def cost(self) -> Decimal:
+        """Dollars spent on this extraction, at list price."""
+        prices = MODELS[self.model]
+        return (
+            self.input_tokens * prices.input_price + self.output_tokens * prices.output_price
+        ) / Decimal(1_000_000)
 
 
 def _file_block(data: bytes, media_type: str) -> dict:
@@ -70,8 +111,15 @@ def _file_block(data: bytes, media_type: str) -> dict:
     }
 
 
-def extract_invoice(data: bytes, media_type: str, client: anthropic.Anthropic) -> ExtractionResult:
+def extract_invoice(
+    data: bytes,
+    media_type: str,
+    client: anthropic.Anthropic,
+    model: str = DEFAULT_MODEL,
+) -> ExtractionResult:
     """Ask Claude to read the invoice, retrying once if the result breaks our rules."""
+    if model not in MODELS:
+        raise ValueError(f"Unknown model: {model}")
     if media_type not in SUPPORTED_TYPES:
         raise ExtractionError(f"Unsupported file type: {media_type}")
 
@@ -80,12 +128,10 @@ def extract_invoice(data: bytes, media_type: str, client: anthropic.Anthropic) -
 
     for attempt in range(1, MAX_ATTEMPTS + 1):
         response = client.beta.messages.parse(
-            model=MODEL,
+            model=model,
             max_tokens=16000,
             system=SYSTEM_PROMPT,
-            output_config={"effort": "low"},
-            betas=["server-side-fallback-2026-07-01"],
-            fallbacks="default",
+            **MODELS[model].request_options,
             messages=[
                 {
                     "role": "user",
@@ -115,6 +161,6 @@ def extract_invoice(data: bytes, media_type: str, client: anthropic.Anthropic) -
             )
             continue
 
-        return ExtractionResult(invoice, attempt, input_tokens, output_tokens)
+        return ExtractionResult(invoice, attempt, input_tokens, output_tokens, model)
 
     raise ExtractionError(f"Could not get a valid invoice after {MAX_ATTEMPTS} attempts.")

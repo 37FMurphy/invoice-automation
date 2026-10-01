@@ -1,7 +1,7 @@
 .PHONY: setup db run test lint
 
 setup:
-	python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
+	python3 -m venv .venv && .venv/bin/pip install -e ".[dev,eval]"
 
 db:
 	docker compose up -d db

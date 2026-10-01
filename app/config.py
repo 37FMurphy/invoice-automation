@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     anthropic_api_key: str | None = None
+    extraction_model: str = "claude-opus-5-5"
     max_upload_mb: int = 10
 
 
