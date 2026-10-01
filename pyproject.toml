@@ -12,10 +12,13 @@ dependencies = [
   "uvicorn[standard]>=0.29",
   "pydantic-settings>=2.2",
   "psycopg[binary]>=3.1",
+  "anthropic>=1.0",
+  "jinja2>=3.1",
+  "python-multipart>=0.0.9",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "ruff>=0.4", "mypy>=1.10"]
+dev = ["pytest>=8", "ruff>=0.4", "mypy>=1.10", "httpx>=0.27"]
 
 [tool.setuptools.packages.find]
 include = ["app*", "pipeline*"]

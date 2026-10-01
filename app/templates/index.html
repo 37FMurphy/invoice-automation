@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Upload an invoice</h1>
+<p class="muted">AI reads the invoice, then every number is checked before anyone pays it.</p>
+
+{% if error %}<div class="alert bad">{{ error }}</div>{% endif %}
+
+<div class="card">
+  <h2>Your invoice</h2>
+  {% if has_api_key %}
+  <form action="/invoices" method="post" enctype="multipart/form-data">
+    <p><input type="file" name="file" accept=".pdf,.png,.jpg,.jpeg,.gif,.webp" required></p>
+    <button class="button" type="submit">Extract and check</button>
+    <span class="muted">PDF or image, up to 10 MB. Takes about 10 to 30 seconds.</span>
+  </form>
+  {% else %}
+  <p class="muted">Uploads need an Anthropic API key. Add <code>ANTHROPIC_API_KEY=...</code>
+    to the <code>.env</code> file and restart the app.</p>
+  <button class="button" disabled>Extract and check</button>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>No invoice handy?</h2>
+  <p class="muted">See the results page using a built-in sample invoice that has two deliberate mistakes.</p>
+  <a class="button secondary" href="/sample">Try the sample</a>
+</div>
+{% endblock %}

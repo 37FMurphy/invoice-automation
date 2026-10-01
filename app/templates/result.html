@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>{{ invoice.vendor_name }}</h1>
+<p class="muted">From {{ filename }}</p>
+
+{% if issues %}
+<div class="alert bad">
+  <strong>Needs review: {{ issues|length }} problem{{ "s" if issues|length != 1 }} found</strong>
+  <ul>{% for issue in issues %}<li>{{ issue.message }}</li>{% endfor %}</ul>
+</div>
+{% else %}
+<div class="alert ok"><strong>All checks passed.</strong> The math adds up and the dates make sense.</div>
+{% endif %}
+
+{% set flagged = issues|map(attribute="field")|list %}
+
+<div class="card">
+  <h2>Invoice details</h2>
+  <dl>
+    <div><dt>Invoice number</dt><dd>{{ invoice.invoice_number }}</dd></div>
+    <div><dt>Invoice date</dt><dd>{{ invoice.invoice_date }}</dd></div>
+    <div><dt>Due date</dt><dd>{{ invoice.due_date or "Not stated" }}</dd></div>
+    <div><dt>PO number</dt><dd>{{ invoice.po_number or "Not stated" }}</dd></div>
+    <div><dt>Currency</dt><dd>{{ invoice.currency }}</dd></div>
+  </dl>
+</div>
+
+<div class="card">
+  <h2>Line items</h2>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Description</th><th class="num">Qty</th><th class="num">Unit price</th><th class="num">Amount</th></tr></thead>
+    <tbody>
+      {% for item in invoice.line_items %}
+      <tr class="{{ 'flagged' if 'line_items[%d]'|format(loop.index) in flagged }}">
+        <td>{{ item.description }}</td>
+        <td class="num">{{ item.quantity }}</td>
+        <td class="num">{{ item.unit_price }}</td>
+        <td class="num">{{ item.amount }}</td>
+      </tr>
+      {% endfor %}
+      <tr class="{{ 'flagged' if 'subtotal' in flagged }}"><td colspan="3">Subtotal</td><td class="num">{{ invoice.subtotal }}</td></tr>
+      <tr><td colspan="3">Tax</td><td class="num">{{ invoice.tax }}</td></tr>
+      <tr class="{{ 'flagged' if 'total' in flagged }}"><td colspan="3"><strong>Total</strong></td><td class="num"><strong>{{ invoice.total }}</strong></td></tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+{% if stats %}
+<div class="card">
+  <h2>Processing stats</h2>
+  <dl>
+    <div><dt>AI attempts</dt><dd>{{ stats.attempts }}</dd></div>
+    <div><dt>Input tokens</dt><dd>{{ stats.input_tokens }}</dd></div>
+    <div><dt>Output tokens</dt><dd>{{ stats.output_tokens }}</dd></div>
+    <div><dt>Estimated cost</dt><dd>{{ stats.cost }}</dd></div>
+  </dl>
+</div>
+{% endif %}
+
+<a class="button secondary" href="/">Check another invoice</a>
+{% endblock %}
